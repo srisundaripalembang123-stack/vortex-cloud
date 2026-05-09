@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Vortex Cloud</title>
+  <style>
+    body { margin:0; background:#000; color:#0ff; font-family:monospace; }
+    #screen { width:100vw; height:100vh; object-fit:contain; }
+   .controls { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:10px; }
+    button { background:#00f5ff; border:none; padding:12px 20px; border-radius:8px; font-weight:bold; }
+    #status { position:fixed; top:10px; left:10px; background:#000a; padding:8px; border-radius:8px; }
+  </style>
+</head>
+<body>
+  <video id="screen" autoplay playsinline></video>
+  <div id="status">Status: Disconnected</div>
+  <div class="controls">
+    <button id="hostBtn">Jadi Host</button>
+    <button id="joinBtn">Join Cloud</button>
+  </div>
+
+<script>
+let pc, localStream, dataChannel;
+const status = document.getElementById('status');
+const screen = document.getElementById('screen');
+
+// Mode HOST: HP yang di-remote
+document.getElementById('hostBtn').onclick = async () => {
+  status.textContent = 'Status: Host - Share Layar...';
+  try {
+    localStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+    screen.srcObject = localStream;
+    setupWebRTC(true);
+  } catch(e) { status.textContent = 'Error: ' + e.message; }
+};
+
+// Mode CLIENT: HP yang ngontrol
+document.getElementById('joinBtn').onclick = () => {
+  status.textContent = 'Status: Client - Paste SDP...';
+  setupWebRTC(false);
+};
+
+function setupWebRTC(isHost) {
+  pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+
+  if (isHost) {
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    dataChannel = pc.createDataChannel('controls');
+    pc.createOffer().then(offer => {
+      pc.setLocalDescription(offer);
+      prompt('Copy SDP ini ke HP Client:', JSON.stringify(pc.localDescription));
+    });
+  } else {
+    const offer = prompt('Paste SDP dari HP Host:');
+    pc.setRemoteDescription(JSON.parse(offer));
+    pc.createAnswer().then(answer => {
+      pc.setLocalDescription(answer);
+      prompt('Copy SDP Answer ini ke HP Host:', JSON.stringify(pc.localDescription));
+    });
+    pc.ontrack = e => { screen.srcObject = e.streams[0]; };
+  }
+
+  pc.ondatachannel = e => {
+    e.channel.onmessage = ev => {
+      const { x, y, type } = JSON.parse(ev.data);
+      // Simulasi tap pake Shizuku: input tap x y
+      console.log('Remote tap:', x, y);
+    };
+  };
+
+  // Kirim input touch ke host
+  screen.onclick = e => {
+    if (dataChannel?.readyState === 'open') {
+      const rect = screen.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width;
+      const y = (e.clientY - rect.top) / rect.height;
+      dataChannel.send(JSON.stringify({ x, y, type: 'tap' }));
+    }
+  };
+}
+</script>
+</body>
+</html>
