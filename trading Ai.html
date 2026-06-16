@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XAUUSD Pro AI Predictor - Live Market</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-dark: #05070a;
+            --glass-bg: rgba(15, 20, 30, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --gold: #FFD700;
+            --gold-glow: rgba(255, 215, 0, 0.3);
+            --cyan: #00E5FF;
+            --green: #00E676;
+            --red: #FF1744;
+            --text-main: #E0E6ED;
+            --text-muted: #8A9BB3;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: radial-gradient(circle at 50% 0%, #111a2a 0%, var(--bg-dark) 100%);
+            color: var(--text-main);
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container { width: 100%; max-width: 1440px; }
+
+        /* Glassmorphism Panel */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Header */
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 24px; flex-wrap: wrap; gap: 20px;
+        }
+
+        .brand h1 {
+            font-size: 28px; font-weight: 800;
+            background: linear-gradient(90deg, var(--gold), #FFF8DC);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            text-transform: uppercase; letter-spacing: 2px;
+        }
+        .brand p { color: var(--cyan); font-size: 12px; letter-spacing: 1px; }
+
+        .price-display { display: flex; align-items: center; gap: 30px; }
+        .live-price { font-size: 42px; font-weight: 700; font-variant-numeric: tabular-nums; text-shadow: 0 0 20px var(--gold-glow); }
+        .live-price.up { color: var(--green); text-shadow: 0 0 20px rgba(0, 230, 118, 0.3); }
+        .live-price.down { color: var(--red); text-shadow: 0 0 20px rgba(255, 23, 68, 0.3); }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+            background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+        }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .dot.connected { background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 1.5s infinite; }
+        .dot.disconnected { background: var(--red); box-shadow: 0 0 10px var(--red); }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
+
+        /* Grid Layout */
+        .grid { display: grid; grid-template-columns: 2.5fr 1fr; gap: 24px; }
+        @media (max-width: 1024px) { .grid { grid-template-columns: 1fr; } }
+
+        /* Chart Area */
+        .chart-container { height: 450px; width: 100%; position: relative; margin-bottom: 24px; }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+        }
+        .metric-card {
+            background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border);
+            padding: 16px; border-radius: 12px; text-align: center;
+        }
+        .metric-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
+        .metric-value { font-size: 20px; font-weight: 700; color: var(--text-main); }
+
+        /* AI Prediction Panel */
+        .ai-panel { display: flex; flex-direction: column; gap: 20px; }
+        
+        .signal-box {
+            text-align: center; padding: 40px 20px; border-radius: 16px;
+            background: linear-gradient(180deg, rgba(20, 25, 35, 0.8) 0%, rgba(10, 15, 20, 0.9) 100%);
+            border: 2px solid; position: relative; overflow: hidden;
+        }
+        .signal-box::before {
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: conic-gradient(transparent, transparent, transparent, var(--gold));
+            animation: rotate 4s linear infinite; opacity: 0.1;
+        }
+        @keyframes rotate { 100% { transform: rotate(360deg); } }
+
+        .signal-text { font-size: 56px; font-weight: 900; letter-spacing: 4px; position: relative; z-index: 1; }
+        .signal-buy { color: var(--green); border-color: rgba(0, 230, 118, 0.4); text-shadow: 0 0 30px rgba(0, 230, 118, 0.4); }
+        .signal-sell { color: var(--red); border-color: rgba(255, 23, 68, 0.4); text-shadow: 0 0 30px rgba(255, 23, 68, 0.4); }
+        .signal-hold { color: var(--gold); border-color: rgba(255, 215, 0, 0.4); text-shadow: 0 0 30px rgba(255, 215, 0, 0.4); }
+        
+        .confidence { font-size: 14px; color: var(--text-muted); margin-top: 10px; position: relative; z-index: 1; }
+
+        /* Terminal Log */
+        .terminal {
+            background: #000; border: 1px solid #333; border-radius: 12px;
+            padding: 16px; height: 350px; overflow-y: auto;
+            font-family: 'Fira Code', 'Consolas', monospace; font-size: 12px; line-height: 1.6;
+        }
+        .terminal::-webkit-scrollbar { width: 6px; }
+        .terminal::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        
+        .log-entry { margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; }
+        .log-time { color: #5c6370; margin-right: 8px; }
+        .log-type-calc { color: #61afef; }
+        .log-type-alert { color: #e5c07b; }
+        .log-type-exec { color: #98c379; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="glass-panel header">
+        <div class="brand">
+            <h1>XAUUSD AI Core</h1>
+            <p><i class="fas fa-microchip"></i> QUANTUM ALGORITHMIC ENGINE v2.0</p>
+        </div>
+        
+        <div class="price-display">
+            <div>
+                <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Spot Gold (Real-Time)</div>
+                <div class="live-price" id="mainPrice">$0.00</div>
+            </div>
+            <div class="status-badge" id="connStatus">
+                <div class="dot disconnected" id="connDot"></div>
+                <span id="connText">Menghubungkan ke Market...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="glass-panel">
+            <div class="chart-container">
+                <canvas id="marketChart"></canvas>
+            </div>
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-title">RSI (14)</div>
+                    <div class="metric-value" id="valRsi">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">MACD Status</div>
+                    <div class="metric-value" id="valMacd" style="font-size: 16px;">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">Volume (1m)</div>
+                    <div class="metric-value" id="valVol">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">Trend MA</div>
+                    <div class="metric-value" id="valTrend" style="font-size: 16px;">--</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ai-panel">
+            <div class="glass-panel signal-box signal-hold" id="signalBox">
+                <div class="signal-text" id="signalText">HOLD</div>
+                <div class="confidence">AI Confidence: <strong id="confidenceVal" style="color:var(--text-main);">0%</strong></div>
+            </div>
+
+            <div class="glass-panel" style="flex-grow: 1;">
+                <div style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--cyan);">
+                    <i class="fas fa-terminal"></i> AI Processing Thread
+                </div>
+                <div class="terminal" id="terminalLog">
+                    </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Konfigurasi Market (Menggunakan Binance PAXG/USDT sebagai proxy XAU/USD 1:1)
+    const WS_URL = 'wss://stream.binance.com:9443/ws/paxgusdt@kline_1m';
+    
+    // State Aplikasi
+    const state = {
+        priceHistory: [], // Menyimpan harga penutupan (close)
+        volumeHistory: [],
+        currentCandle: null,
+        chartInstance: null,
+        indicators: { rsi: 50, sma5: 0, sma20: 0, macdLine: 0, macdSig: 0 }
+    };
+
+    // DOM Elements
+    const elPrice = document.getElementById('mainPrice');
+    const elConnDot = document.getElementById('connDot');
+    const elConnText = document.getElementById('connText');
+    const elTerminal = document.getElementById('terminalLog');
+    const elSignalText = document.getElementById('signalText');
+    const elSignalBox = document.getElementById('signalBox');
+    const elConf = document.getElementById('confidenceVal');
+
+    // Fungsi Print Terminal Log
+    function logTerminal(message, type = 'calc') {
+        const time = new Date().toLocaleTimeString('id-ID', { hour12: false, fractionalSecondDigits: 1 });
+        const div = document.createElement('div');
+        div.className = 'log-entry';
+        
+        let colorClass = type === 'alert' ? 'log-type-alert' : type === 'exec' ? 'log-type-exec' : 'log-type-calc';
+        let prefix = type === 'alert' ? '[WARN]' : type === 'exec' ? '[SIGNAL]' : '[CALC]';
+        
+        div.innerHTML = `<span class="log-time">${time}</span> <span class="${colorClass}">${prefix} ${message}</span>`;
+        elTerminal.appendChild(div);
+        elTerminal.scrollTop = elTerminal.scrollHeight;
+    }
+
+    // Inisialisasi Chart.js Mewah
+    function initChart() {
+        const ctx = document.getElementById('marketChart').getContext('2d');
+        
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(0, 229, 255, 0.4)');
+        gradient.addColorStop(1, 'rgba(0, 229, 255, 0)');
+
+        state.chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(60).fill(''), // 60 menit terakhir
+                datasets: [{
+                    label: 'Live Price',
+                    data: Array(60).fill(null),
+                    borderColor: '#00E5FF',
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.2,
+                    fill: true,
+                }, {
+                    label: 'SMA 20',
+                    data: Array(60).fill(null),
+                    borderColor: '#FFD700',
+                    borderWidth: 1.5,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    tension: 0.2,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                animation: false, // Matikan animasi agar realtime mulus
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { display: false },
+                    y: { 
+                        position: 'right', 
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: { color: '#8A9BB3', callback: v => '$' + v }
+                    }
+                }
+            }
+        });
+    }
+
+    // Update Chart Data
+    function updateChart(price, sma20) {
+        const dataArr = state.chartInstance.data.datasets[0].data;
+        const smaArr = state.chartInstance.data.datasets[1].data;
+        
+        dataArr.push(price);
+        smaArr.push(sma20 || price);
+        
+        if (dataArr.length > 60) {
+            dataArr.shift();
+            smaArr.shift();
+        }
+        state.chartInstance.update();
+    }
+
+    // Matematika Algoritma Market
+    function calculateSMA(data, period) {
+        if (data.length < period) return null;
+        const slice = data.slice(-period);
+        return slice.reduce((a, b) => a + b, 0) / period;
+    }
+
+    function calculateRSI(data, period = 14) {
+        if (data.length < period + 1) return 50;
+        let gains = 0, losses = 0;
+        for (let i = data.length - period; i < data.length; i++) {
+            const diff = data[i] - data[i - 1];
+            if (diff >= 0) gains += diff;
+            else losses -= diff;
+        }
+        const avgGain = gains / period;
+        const avgLoss = losses / period;
+        if (avgLoss === 0) return 100;
+        const rs = avgGain / avgLoss;
+        return 100 - (100 / (1 + rs));
+    }
+
+    // Proses Logika AI Real-time
+    function processAI(price) {
+        const hist = state.priceHistory;
+        if (hist.length < 20) return; // Butuh data awal
+
+        // Kalkulasi Indikator
+        const sma5 = calculateSMA(hist, 5);
+        const sma20 = calculateSMA(hist, 20);
+        const rsi = calculateRSI(hist, 14);
+        
+        state.indicators = { rsi, sma5, sma20 };
+
+        // Update UI Indikator
+        document.getElementById('valRsi').textContent = rsi.toFixed(1);
+        document.getElementById('valRsi').style.color = rsi > 70 ? 'var(--red)' : rsi < 30 ? 'var(--green)' : 'var(--text-main)';
+        document.getElementById('valTrend').textContent = sma5 > sma20 ? 'BULLISH' : 'BEARISH';
+        document.getElementById('valTrend').style.color = sma5 > sma20 ? 'var(--green)' : 'var(--red)';
+
+        // Logika Otak AI
+        let score = 0;
+        let reasoning = [];
+
+        logTerminal(`Analisis data harga: $${price.toFixed(2)}`, 'calc');
+
+        if (rsi > 70) {
+            score -= 3; reasoning.push(`RSI Overbought (${rsi.toFixed(1)})`);
+            logTerminal(`Deteksi Overbought RSI: Probabilitas reversal turun tinggi.`, 'alert');
+        } else if (rsi < 30) {
+            score += 3; reasoning.push(`RSI Oversold (${rsi.toFixed(1)})`);
+            logTerminal(`Deteksi Oversold RSI: Probabilitas pantulan naik tinggi.`, 'exec');
+        }
+
+        if (sma5 > sma20) {
+            score += 2; reasoning.push('Tren Jangka Pendek Naik (SMA5 > SMA20)');
+        } else {
+            score -= 2; reasoning.push('Tren Jangka Pendek Turun (SMA5 < SMA20)');
+        }
+
+        // Penentuan Sinyal Akhir
+        let signal = 'HOLD';
+        let conf = 50;
+        let boxClass = 'signal-hold';
+
+        if (score >= 3) {
+            signal = 'BUY'; conf = 75 + (score * 5); boxClass = 'signal-buy';
+        } else if (score <= -3) {
+            signal = 'SELL'; conf = 75 + (Math.abs(score) * 5); boxClass = 'signal-sell';
+        } else {
+            conf = 50 + (Math.abs(score) * 5);
+        }
+
+        // Eksekusi Update Visual
+        if (elSignalText.textContent !== signal) {
+            logTerminal(`MENGUBAH KEPUTUSAN MENJADI: ${signal} (Confidence: ${Math.min(conf, 99)}%)`, 'exec');
+            elSignalText.textContent = signal;
+            elSignalBox.className = `glass-panel signal-box ${boxClass}`;
+        }
+        elConf.textContent = `${Math.min(conf, 99)}%`;
+
+        updateChart(price, sma20);
+    }
+
+    // Koneksi WebSocket
+    function connectWebSocket() {
+        logTerminal('Membuka protokol WebSocket ke market engine...', 'calc');
+        const ws = new WebSocket(WS_URL);
+
+        ws.onopen = () => {
+            elConnDot.className = 'dot connected';
+            elConnText.textContent = 'Terhubung (Live Market)';
+            elConnText.style.color = 'var(--green)';
+            logTerminal('Koneksi sukses. Menunggu aliran data tick...', 'exec');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            const kline = data.k; 
+            const currentPrice = parseFloat(kline.c);
+            const isCandleClosed = kline.x;
+            const volume = parseFloat(kline.v);
+
+            // Update UI Harga Tick-by-tick
+            const prevPrice = parseFloat(elPrice.dataset.prev || currentPrice);
+            elPrice.textContent = `$${currentPrice.toFixed(2)}`;
+            if (currentPrice > prevPrice) elPrice.className = 'live-price up';
+            else if (currentPrice < prevPrice) elPrice.className = 'live-price down';
+            elPrice.dataset.prev = currentPrice;
+
+            document.getElementById('valVol').textContent = volume.toFixed(2);
+
+            // Jika candle 1 menit ditutup, simpan ke memori dan jalankan otak AI
+            if (isCandleClosed) {
+                state.priceHistory.push(currentPrice);
+                if (state.priceHistory.length > 100) state.priceHistory.shift(); // Batasi memori
+                logTerminal(`Candle ditutup pada harga $${currentPrice.toFixed(2)}`, 'calc');
+                processAI(currentPrice);
+            } else {
+                // Untuk real-time update chart tanpa nunggu candle tutup
+                updateChart(currentPrice, state.indicators.sma20);
+            }
+        };
+
+        ws.onerror = (error) => {
+            logTerminal('Gagal terhubung ke node market.', 'alert');
+        };
+
+        ws.onclose = () => {
+            elConnDot.className = 'dot disconnected';
+            elConnText.textContent = 'Terputus. Mencoba ulang...';
+            elConnText.style.color = 'var(--red)';
+            logTerminal('Koneksi terputus. Melakukan autoreconnect dalam 3 detik...', 'alert');
+            setTimeout(connectWebSocket, 3000);
+        };
+    }
+
+    // Mulai Eksekusi
+    window.onload = () => {
+        initChart();
+        // Simulasi pengisian data awal agar AI tidak kosong saat pertama buka
+        logTerminal('Melakukan pre-fetching data historis buatan untuk memancing indikator...', 'calc');
+        let base = 2350;
+        for(let i=0; i<30; i++) {
+            base = base + (Math.random() * 4 - 2);
+            state.priceHistory.push(base);
+        }
+        connectWebSocket();
+    };
+</script>
+</body>
+</html>
